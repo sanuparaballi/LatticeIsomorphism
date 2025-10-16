@@ -11,29 +11,22 @@ import pytest
 import sys
 import os
 
-
-# --- IDE-Friendly Package Importing ---
 try:
-    from lattice_ga.lattice import Lattice
+    from lattice_ga import Lattice
 except ImportError:
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.append(os.path.join(project_root, 'src'))
-    from lattice_ga.lattice import Lattice
+    from lattice_ga import Lattice
 
-
-# A valid unimodular integer basis for testing
-VALID_BASIS = np.array([[1, 1, 0], [0, 1, 0], [0, 0, 1]])
+# A valid Gram matrix for a unimodular lattice (Z^3)
+VALID_GRAM_MATRIX = np.array([[1, 1, 0], [1, 2, 0], [0, 0, 1]])
 
 
 def test_lattice_creation_success():
-    """Tests that a Lattice object is created successfully with a valid basis."""
-    lattice = Lattice(VALID_BASIS)
-    assert np.array_equal(lattice.basis, VALID_BASIS)
+    """Tests that a Lattice object is created successfully with a valid Gram matrix."""
+    lattice = Lattice(VALID_GRAM_MATRIX)
+    assert np.array_equal(lattice.gram_matrix, VALID_GRAM_MATRIX)
     assert lattice.dim == 3
-
-    # Check if the Gram matrix is calculated correctly
-    expected_gram = VALID_BASIS.T @ VALID_BASIS
-    assert np.array_equal(lattice.gram_matrix, expected_gram)
 
 
 def test_fails_on_non_square_matrix():
@@ -45,14 +38,29 @@ def test_fails_on_non_square_matrix():
 
 def test_fails_on_non_integer_matrix():
     """Tests that Lattice creation fails if the matrix contains non-integers."""
-    non_integer = np.array([[1.5, 2], [3, 4]])
+    non_integer = np.array([[1.5, 2], [2, 4]])
     with pytest.raises(ValueError, match="must be integers"):
         Lattice(non_integer)
 
 
-def test_fails_on_non_unimodular_matrix():
-    """Tests that Lattice creation fails if the matrix determinant is not +/- 1."""
-    # This matrix has a determinant of 2
-    non_unimodular = np.array([[1, 1], [0, 2]])
-    with pytest.raises(ValueError, match="must be unimodular"):
-        Lattice(non_unimodular)
+def test_fails_on_non_symmetric_matrix():
+    """Tests that Lattice creation fails if the matrix is not symmetric."""
+    non_symmetric = np.array([[1, 2], [3, 4]])
+    with pytest.raises(ValueError, match="must be symmetric"):
+        Lattice(non_symmetric)
+
+
+def test_fails_on_non_positive_definite_matrix():
+    """Tests that Lattice creation fails if the matrix is not positive-definite."""
+    # This matrix has eigenvalues [3, -1], so it's not positive-definite
+    not_pos_def = np.array([[1, 2], [2, 1]])
+    with pytest.raises(ValueError, match="must be positive-definite"):
+        Lattice(not_pos_def)
+
+
+def test_fails_on_non_unimodular_gram_matrix():
+    """Tests that Lattice creation fails if the Gram matrix determinant is not 1."""
+    # This matrix corresponds to a basis with det=2, so det(G) = 4
+    non_unimodular_gram = np.array([[1, 0], [0, 4]])
+    with pytest.raises(ValueError, match="determinant must be 1"):
+        Lattice(non_unimodular_gram)
