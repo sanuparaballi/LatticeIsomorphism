@@ -97,6 +97,9 @@ def main():
     Loads a high-dimensional test case from a .npz file and runs the GA.
     """
     # --- 1. Set up Argument Parser ---
+    np.random.seed(42)
+    # random.seed(42)
+
     parser = argparse.ArgumentParser(
         description="Run GA for Lattice Isometry.")
     parser.add_argument(
@@ -136,6 +139,9 @@ def main():
         print(f"Error: Test data file not found at '{test_data_path}'.")
         print("Please run 'python tests/generate_test_cases.py' first.")
         return
+
+    # --- DIAGNOSTIC: Check the loaded data type ---
+    print(f"DEBUG: Loaded matrix data type is {gram_g.dtype}")
 
     print("--- Experiment Setup ---")
     print(f"Running {dim}D '{args.case}' test case.")

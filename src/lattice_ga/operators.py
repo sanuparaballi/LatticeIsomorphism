@@ -27,42 +27,59 @@ def crossover(parent1: np.ndarray, parent2: np.ndarray) -> np.ndarray:
     return parent1 @ parent2
 
 
-def mutation(chromosome_u: np.ndarray, mutation_strength: int = 1) -> np.ndarray:
+def error_guided_mutation(u_matrix: np.ndarray, target_g: np.ndarray, mutation_strength: int = 1) -> np.ndarray:
     """
-    Applies a mutation by multiplying with a random elementary matrix.
+    Applies an intelligent mutation guided by the fitness error.
 
-    An elementary matrix E(i, j, r) is an identity matrix with one additional
-    off-diagonal entry, E_ij = r. Multiplying by E on the right performs a
-    column operation (adds r * column_i to column_j), which is a valid
-    unimodular transformation for integer r.
+    This operator identifies the largest error in the current solution's Gram
+    matrix (G - U^T*U) and applies a targeted elementary transformation to
+    the two columns of U that are causing that error. This is far more
+    efficient than a random mutation.
 
     Args:
-        chromosome_u (np.ndarray): The matrix to be mutated.
+        u_matrix (np.ndarray): The matrix to be mutated.
+        target_g (np.ndarray): The target Gram matrix (G).
         mutation_strength (int): The maximum absolute value of the integer 'r'
                                  used in the elementary matrix. Defaults to 1.
 
     Returns:
-        np.ndarray: The mutated matrix.
+        np.ndarray: The intelligently mutated matrix.
     """
-    n = chromosome_u.shape[0]
+    n = u_matrix.shape[0]
     if n < 2:
-        return chromosome_u  # Cannot mutate a 1x1 matrix this way
+        return u_matrix
 
-    # 1. Choose two different indices for the column operation
-    i, j = random.sample(range(n), 2)
+    # 1. Calculate the Error Matrix: E = G - U^T * U
+    current_g = u_matrix.T @ u_matrix
+    error_matrix = target_g - current_g
 
-    # 2. Choose a small integer 'r' for the transformation
-    # It must be non-zero.
-    r = random.choice(
-        list(range(-mutation_strength, 0)) +
-        list(range(1, mutation_strength + 1))
-    )
+    # 2. Find the Biggest Mistake
+    # We set the diagonal to zero to focus on off-diagonal elements, which
+    # represent the incorrect angles between basis vectors.
+    np.fill_diagonal(error_matrix, 0)
 
-    # 3. Create the elementary matrix E
+    # Find the indices (i, j) of the element with the largest absolute value.
+    # This tells us which two columns are most in need of correction.
+    i, j = np.unravel_index(
+        np.argmax(np.abs(error_matrix)), error_matrix.shape)
+
+    if i == j:  # Should not happen with diagonal zeroed, but as a safeguard
+        return u_matrix
+
+    # 3. Apply a Targeted Fix
+    # Choose a small integer 'r' for the transformation.
+    # A simple choice is to use the sign of the error to guide the direction,
+    # though a random small integer also works well.
+    r = random.choice([-mutation_strength, mutation_strength])
+    if error_matrix[i, j] > 0:
+        r = abs(r)
+    else:
+        r = -abs(r)
+
+    # 4. Create the elementary matrix E and apply the mutation
     elementary_matrix = np.identity(n, dtype=int)
     elementary_matrix[i, j] = r
 
-    # 4. Apply the mutation (a column operation)
-    mutated_u = chromosome_u @ elementary_matrix
+    mutated_u = u_matrix @ elementary_matrix
 
     return mutated_u
