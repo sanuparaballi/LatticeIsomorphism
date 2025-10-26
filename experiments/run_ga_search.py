@@ -11,6 +11,7 @@ import numpy as np
 import sys
 import os
 import argparse
+import random
 
 # --- Add the source directory to the Python path ---
 # This allows us to import our 'lattice_ga' package from the 'src' directory.
@@ -98,7 +99,7 @@ def main():
     """
     # --- 1. Set up Argument Parser ---
     np.random.seed(42)
-    # random.seed(42)
+    random.seed(42)
 
     parser = argparse.ArgumentParser(
         description="Run GA for Lattice Isometry.")
@@ -125,34 +126,45 @@ def main():
 
     # --- 2. Load the specified test case ---
     dim = 256
-    test_data_filename = f"test_data_gram_{dim}d.npz"
+    test_data_filename = f"test_data_basis_{dim}d.npz"
     # The data file is in the 'tests' directory, one level up from 'experiments'
     test_data_path = os.path.join(project_root, 'tests', test_data_filename)
 
     try:
         data = np.load(test_data_path)
         if args.case == 'positive':
-            gram_g = data['positive_gram']
+            target_basis = data['positive_basis']
         else:  # negative case
-            gram_g = data['negative_gram']
+            target_basis = data['negative_basis']
     except FileNotFoundError:
         print(f"Error: Test data file not found at '{test_data_path}'.")
         print("Please run 'python tests/generate_test_cases.py' first.")
         return
 
     # --- DIAGNOSTIC: Check the loaded data type ---
-    print(f"DEBUG: Loaded matrix data type is {gram_g.dtype}")
+    print(f"DEBUG: Loaded matrix data type is {target_basis.dtype}")
 
     print("--- Experiment Setup ---")
     print(f"Running {dim}D '{args.case}' test case.")
     print(f"Loaded Gram matrix from: {test_data_path}\n")
 
+    # # --- 3. Create Lattice Object and Perform Pre-checks ---
+    # try:
+    #     lattice = Lattice(gram_matrix=gram_g)
+    #     print(f"Target Gram Matrix successfully validated.\n")
+    # except ValueError as e:
+    #     print(f"Error: Gram matrix validation failed. {e}")
+    #     return
+
     # --- 3. Create Lattice Object and Perform Pre-checks ---
     try:
-        lattice = Lattice(gram_matrix=gram_g)
-        print(f"Target Gram Matrix successfully validated.\n")
+        lattice = Lattice(basis_matrix=target_basis)
+        print(f"Target Basis successfully validated.\n")
     except ValueError as e:
-        print(f"Error: Gram matrix validation failed. {e}")
+        print(f"Error: Basis matrix validation failed. {e}")
+        if args.case == 'negative':
+            print(
+                "This error is expected for the negative test case as it is not unimodular.")
         return
 
     # --- 4. Set GA Hyperparameters for a large problem ---
@@ -161,8 +173,9 @@ def main():
     ga_params = {
         'population_size': 200,    # Increased for larger search space
         'n_generations': 1000,   # Increased for more evolution time
-        'mutation_rate': 0.3,
-        'n_elites': 10             # Keep more of the best solutions
+        'mutation_rate': 0.5,
+        'n_elites': 10,             # Keep more of the best solutions
+        'local_search_steps': 10
     }
     print("GA Hyperparameters:")
     for key, val in ga_params.items():
@@ -171,7 +184,7 @@ def main():
 
     # --- 5. Initialize and Run the GA ---
     ga = GeneticAlgorithm(
-        target_gram_matrix=lattice.gram_matrix,
+        target_lattice=lattice,
         **ga_params
     )
     best_u, best_fitness = ga.run()
